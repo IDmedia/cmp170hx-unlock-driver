@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.25e">
+  <!ENTITY version   "2026.10.25f">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "649ffe3eef923b24ea96e79046621ed1">
+  <!ENTITY md5       "ab2a051d9b13f8b76ef3462c0407412b">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -15,6 +15,10 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
 
 <CHANGES>
+
+###2026.10.25f
+- Status page banners show the current state (driver loaded, packages, published support) instead of the result of the last boot
+- Red banner at the top when the next Unraid release is not supported yet; the upgrade check also runs at boot
 
 ###2026.10.25e
 - Status page: once a driver is published for the running kernel, the "not supported" banner turns into a "now available" one

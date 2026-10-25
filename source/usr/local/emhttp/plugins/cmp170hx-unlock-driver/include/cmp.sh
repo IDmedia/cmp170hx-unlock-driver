@@ -228,6 +228,9 @@ cmd_boot() {
     return 0
   fi
   cron_off; [ "$(cfg_get update_check)" = true ] && cron_on
+  # warn about an unsupported Unraid release right after boot, not only at the daily check (background:
+  # needs the network, must not delay boot)
+  if [ "$(cfg_get update_check)" = true ] && [ "$DRY" = 0 ]; then cmd_upgrade_check >/dev/null 2>&1 & fi
   if grep -qs '# cmp-unraid gen2' /boot/config/go; then
     notify_once warning "Old cmpunraider setup found" "/boot/config/go still has the cmpunraider Gen2 line. Run 'bash cmpunraider.sh uninstall' (or remove the line marked '# cmp-unraid gen2' and /boot/config/modprobe.d/cmp-pcie-gen2.conf), then reboot."
   fi

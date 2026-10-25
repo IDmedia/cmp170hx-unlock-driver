@@ -33,33 +33,43 @@ function banner(kind, title, body) {
   return '<div class="cmp-banner cmp-b-' + kind + '"><b>' + esc(title) + '</b><br>' + body + '</div>';
 }
 
+// Banners describe the system as it is now (driver loaded, packages, cards, published support), not what
+// happened at boot; the boot result only adds the reason when the driver is missing.
 function renderBanners(d) {
   var h = '', st = (d.state && d.state.status) || '', det = (d.state && d.state.detail) || '';
+  var want = (d.settings && d.settings.card_profile) || 'auto', det_prof = d.detected_profile;
+  var reboot = 'reboot (a full power-off the first time, so the card unlocks)';
   if (d.conflict) {
     h += banner('bad', 'Plugin conflict', 'The Nvidia Driver plugin is installed. It cannot run together with this plugin: remove one of them and reboot. No patched driver is installed while both are present.');
-  }
-  // the boot state is from the last boot; support published since then turns it into a "ready" message
-  if ((st === 'unsupported' || st === 'unknown') && d.kernel_support === 'supported') {
-    h += banner('warn', 'Patched driver now available', d.cached_package
-      ? 'The driver for kernel ' + esc(d.kernel) + ' is downloaded. Reboot to install it (a full power-off the first time, so the card unlocks).'
-      : 'A patched driver for kernel ' + esc(d.kernel) + ' has been published since the last boot. Click <i>Download package now</i>, then reboot (a full power-off the first time, so the card unlocks).');
-  } else if (st === 'unsupported') {
-    h += banner('bad', 'Kernel ' + d.kernel + ' is not supported yet', 'No patched driver is published for this Unraid version, so <b>no GPU driver was installed</b>. Your array and Docker are unaffected. The driver installs automatically after support is published: reboot then, or use <i>Re-check now</i>. Your settings are kept.');
-  } else if (st === 'unknown') {
-    h += banner('warn', 'Driver not installed', 'The release server could not be reached at boot, so nothing was installed. Check your internet connection and reboot.');
-  } else if (st === 'error') {
-    h += banner('bad', 'Driver not installed', esc(det) + '. Use <i>Download diagnostics</i> and check the system log.');
-  } else if (st === 'not_loaded') {
+  } else if (det_prof && want !== 'auto' && want !== 'mixed' && want !== det_prof) {
+    h += banner('bad', 'Card profile mismatch', 'The card profile setting (' + esc(want) + ') contradicts the detected card (' + esc(det_prof) + '). Set it to Auto-detect and reboot.');
+  } else if (d.module.version) {
+    if (d.gpus.some(function(g) { return g.unlock === 'stock'; })) {
+      h += banner('warn', 'Cold boot required', 'The driver is loaded but the card still reports stock memory. Shut the server <b>down completely</b>, wait until power fully drops, then power on. A reboot is not enough.');
+    } else if (d.gpus.length && d.gpus.every(function(g) { return g.unlock === 'unlocked'; })) {
+      h += banner('ok', 'Driver active, card unlocked', 'Patched driver ' + esc(d.module.version) + ' is loaded and every CMP 170HX reports its full memory.');
+    }
+  } else if (d.installed_package) {
     h += banner(d.cards.length ? 'bad' : 'warn', 'Driver installed but not loaded', 'The patched driver packages are installed, but the nvidia kernel module did not load.' + (d.cards.length ? ' Use <i>Download diagnostics</i> and check the system log.' : ' No CMP 170HX is in this server, so this is expected with a forced card profile.'));
-  } else if (st === 'profile_mismatch') {
-    h += banner('bad', 'Card profile mismatch', 'The card profile setting (' + esc(det.split('|')[0]) + ') contradicts the detected card (' + esc(det.split('|')[1]) + '). Fix the setting and reboot. No driver was installed.');
-  } else if (st === 'no_gpu') {
-    h += banner('warn', 'No CMP 170HX detected', 'No supported card was found on the PCI bus, so nothing was installed. Install the card, or pick a card profile below.');
+  } else if (!d.cards.length && want === 'auto') {
+    h += banner('warn', 'No CMP 170HX detected', 'No supported card was found on the PCI bus, so no driver is installed. Install the card, or pick a card profile below.');
+  } else if (d.kernel_support === 'unsupported') {
+    h += banner('bad', 'Kernel ' + esc(d.kernel) + ' is not supported yet', 'No patched driver is published for this Unraid version, so <b>no GPU driver is installed</b>. Your array and Docker are unaffected. Once support is published this page says so; then download it and ' + reboot + '. Your settings are kept.');
+  } else if (d.kernel_support === 'supported') {
+    h += banner('warn', 'No driver installed yet', (d.cached_package
+      ? 'The patched driver for kernel ' + esc(d.kernel) + ' is downloaded. To install it, ' + reboot + '.'
+      : 'A patched driver for kernel ' + esc(d.kernel) + ' is available. Click <i>Download package now</i>, then ' + reboot + '.')
+      + (st === 'error' ? '<br>Last boot: ' + esc(det) + '.' : ''));
+  } else if (d.kernel_support === 'unknown') {
+    h += banner('warn', 'No driver installed', 'The release server cannot be reached, so it is unknown whether a driver exists for kernel ' + esc(d.kernel) + '. Check the internet connection and use <i>Re-check now</i>.');
   }
-  var needCold = st === 'installed' && d.gpus && d.gpus.some(function(g) { return g.unlock === 'stock'; });
-  if (needCold) {
-    h += banner('warn', 'Cold boot required', 'The driver is installed but the card still reports stock memory. Shut the server <b>down completely</b>, wait until power fully drops, then power on. A reboot is not enough.');
-  }
+  (d.upgrade && d.upgrade.results || []).forEach(function(r) {
+    if (r.status === 'unsupported') {
+      h += banner('bad', 'Do not upgrade to Unraid ' + r.version + ' yet', 'Unraid ' + esc(r.version) + ' uses kernel ' + esc(r.kernel) + ', and no patched CMP 170HX driver is published for it yet. Upgrading now leaves the GPU <b>without a driver</b> until support is added. Wait until this page lists the release as supported.');
+    } else if (r.status === 'unknown') {
+      h += banner('warn', 'Unraid ' + r.version + ': support unknown', 'Could not determine which kernel Unraid ' + esc(r.version) + ' uses, so its support cannot be verified. Hold off upgrading until it shows as supported.');
+    }
+  });
   document.getElementById('cmp-banners').innerHTML = h;
 }
 
@@ -168,6 +178,7 @@ span.cmp-chip.cmp-dim { background:#666; opacity:1; }
 .cmp-banner { padding:10px 14px; margin:8px 0; border-left:5px solid; border-radius:3px; }
 .cmp-b-bad { border-color:#c0392b; background:rgba(192,57,43,.12); }
 .cmp-b-warn { border-color:#b9770e; background:rgba(185,119,14,.12); }
+.cmp-b-ok { border-color:#2e8b3d; background:rgba(46,139,61,.12); }
 .cmp-gpu { margin:8px 0 14px; line-height:1.6; }
 .cmp-form { width:100%; table-layout:fixed; }
 .cmp-form td { padding:6px 12px 6px 0; vertical-align:top; line-height:normal; white-space:normal; overflow-wrap:anywhere; }
@@ -231,7 +242,7 @@ span.cmp-chip.cmp-dim { background:#666; opacity:1; }
           <option value="true" <?=$cur['update_check'] === 'true' ? 'selected' : ''?>>Enabled</option>
           <option value="false" <?=$cur['update_check'] === 'false' ? 'selected' : ''?>>Disabled</option>
         </select>
-        <p class="cmp-note">Daily (8-10 am): warns before an unsupported Unraid upgrade and, with <i>Latest</i>, downloads newer drivers for the next reboot.</p></td></tr>
+        <p class="cmp-note">At boot and daily (8-10 am): warns before an unsupported Unraid upgrade and, with <i>Latest</i>, downloads newer drivers for the next reboot.</p></td></tr>
       <tr><td></td><td>
         <input type="submit" name="cmp_save" value="Save settings">
         <input type="button" value="Download package now" onclick="downloadPkg()">

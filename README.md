@@ -63,8 +63,9 @@ notification and exits normally.
 Each Unraid release has its own kernel, and the patched driver has to be built for that exact kernel. Builds are
 published automatically once the required kernel files exist, which may be some time after an Unraid release.
 
-- **Before you upgrade:** the settings page and a daily notification check whether the next Unraid release has a
-  matching driver. Only upgrade when it shows as supported. Unraid does not let a plugin block an upgrade, so
+- **Before you upgrade:** the plugin checks whether the next Unraid release has a matching driver at boot, once a
+  day and whenever you open its page. An unsupported release gets a red *Do not upgrade to Unraid X yet* banner
+  at the top of the page and an Unraid notification. Only upgrade when it shows as supported. Unraid does not let a plugin block an upgrade, so
   this is a warning only. If the check cannot find out, it says so; it never reports "supported" without proof.
 - **If you upgrade anyway:** no driver is installed for the new kernel, you get a notification, and your
   settings are kept. The array and Docker start normally, but the GPU has no driver. The driver installs on a
@@ -78,7 +79,7 @@ published automatically once the required kernel files exist, which may be some 
 | cmpunlocker version | `latest` or a specific cmpunlocker tag. Only built versions are listed. |
 | Card profile | `Auto-detect` (recommended), 8 GB, 10 GB, or both models. A profile that contradicts the detected card is refused at boot. |
 | PCIe Gen2 retrain | Reloads the driver once at boot and retrains the link to Gen2. |
-| Update notifications | Once a day (8-10 am): warns about unsupported Unraid releases and downloads newer drivers when the version is `latest`. Reboot to install them. |
+| Update notifications | At boot and once a day (8-10 am): warns about unsupported Unraid releases and downloads newer drivers when the version is `latest`. Reboot to install them. |
 
 If the version you selected is not available for your kernel, the newest available build for your card is
 installed instead and you are notified.

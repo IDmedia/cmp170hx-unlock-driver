@@ -1,0 +1,238 @@
+Menu="Utilities"
+Title="CMP 170HX Unlock Driver"
+Icon="cmp170hx-unlock-driver.png"
+---
+<?php
+$name = 'cmp170hx-unlock-driver';
+$cmp  = "/usr/local/emhttp/plugins/$name/include/cmp.sh";
+
+// Save settings (same-page POST; cmp.sh validates every value again)
+$saved = false;
+if (isset($_POST['cmp_save'])) {
+  $fields = ['driver_version' => 'drv', 'cmpunlocker_ref' => 'ref', 'card_profile' => 'profile', 'gen2_enable' => 'gen2', 'update_check' => 'notify'];
+  foreach ($fields as $key => $field) {
+    $val = $_POST[$field] ?? '';
+    if ($val !== '') shell_exec("$cmp set " . escapeshellarg($key) . ' ' . escapeshellarg($val) . ' 2>&1');
+  }
+  $saved = true;
+}
+$s = is_readable("/boot/config/plugins/$name/settings.cfg") ? (parse_ini_file("/boot/config/plugins/$name/settings.cfg", false, INI_SCANNER_RAW) ?: []) : [];
+$cur = array_merge(['driver_version' => 'latest', 'cmpunlocker_ref' => 'latest', 'card_profile' => 'auto', 'gen2_enable' => 'true', 'update_check' => 'true'], $s);
+?>
+
+<script>
+if (window.history.replaceState) { window.history.replaceState(null, null, window.location.href); }
+var CMP_BASE = '/plugins/<?=$name?>/include/';
+var CMP_SETTINGS = <?=json_encode($cur)?>;
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function chip(text, kind) { return '<span class="cmp-chip cmp-' + kind + '">' + esc(text) + '</span>'; }
+function banner(kind, title, body) {
+  return '<div class="cmp-banner cmp-b-' + kind + '"><b>' + esc(title) + '</b><br>' + body + '</div>';
+}
+
+function renderBanners(d) {
+  var h = '', st = (d.state && d.state.status) || '', det = (d.state && d.state.detail) || '';
+  if (d.conflict) {
+    h += banner('bad', 'Plugin conflict', 'The Nvidia Driver plugin is installed. It cannot run together with this plugin: remove one of them and reboot. No patched driver is installed while both are present.');
+  }
+  if (st === 'unsupported') {
+    h += banner('bad', 'Kernel ' + d.kernel + ' is not supported yet', 'No patched driver is published for this Unraid version, so <b>no GPU driver was installed</b>. Your array and Docker are unaffected. The driver installs automatically after support is published: reboot then, or use <i>Re-check now</i>. Your settings are kept.');
+  } else if (st === 'unknown') {
+    h += banner('warn', 'Driver not installed', 'The release server could not be reached at boot, so nothing was installed. Check your internet connection and reboot.');
+  } else if (st === 'error') {
+    h += banner('bad', 'Driver install problem', esc(det) + '. Use <i>Download diagnostics</i> and check the system log.');
+  } else if (st === 'profile_mismatch') {
+    h += banner('bad', 'Card profile mismatch', 'The card profile setting (' + esc(det.split('|')[0]) + ') contradicts the detected card (' + esc(det.split('|')[1]) + '). Fix the setting and reboot. No driver was installed.');
+  } else if (st === 'no_gpu') {
+    h += banner('warn', 'No CMP 170HX detected', 'No supported card was found on the PCI bus, so nothing was installed. Install the card, or pick a card profile below.');
+  }
+  var needCold = st === 'installed' && d.gpus && d.gpus.some(function(g) { return g.unlock === 'stock'; });
+  if (needCold) {
+    h += banner('warn', 'Cold boot required', 'The driver is installed but the card still reports stock memory. Shut the server <b>down completely</b>, wait until power fully drops, then power on. A reboot is not enough.');
+  }
+  document.getElementById('cmp-banners').innerHTML = h;
+}
+
+function unlockChip(g) {
+  switch (g.unlock) {
+    case 'unlocked':   return chip('Unlocked', 'ok');
+    case 'stock':      return chip('Stock memory (not unlocked)', 'bad');
+    case 'unexpected': return chip('Unexpected memory size', 'warn');
+    default:           return chip('Not a CMP 170HX', 'dim');
+  }
+}
+
+function renderStatus(d) {
+  var h = '<table class="cmp-table">';
+  h += '<tr><td>Unraid</td><td>' + esc(d.unraid_version) + ' (kernel ' + esc(d.kernel) + ')</td></tr>';
+  var ks = {supported: chip('Patched driver available', 'ok'), unsupported: chip('Not supported yet', 'bad'), unknown: chip('Cannot verify', 'warn'), '': chip('Not checked yet', 'dim')};
+  h += '<tr><td>Kernel support</td><td>' + (ks[d.kernel_support] || ks['']) + '</td></tr>';
+  h += '<tr><td>Driver</td><td>' + (d.module.version ? esc(d.module.version) + ' ' + chip(/GPL|MIT/i.test(d.module.license) ? 'open-source kernel module' : esc(d.module.license), 'dim') : chip('Not loaded', 'bad')) + '</td></tr>';
+  h += '<tr><td>Installed packages</td><td>' + (d.installed_package ? esc(d.installed_package).replace(/\n/g, '<br>') : '<i>none</i>') + '</td></tr>';
+  h += '<tr><td>Cached for next boot</td><td>' + (d.cached_package ? esc(d.cached_package).replace(/\n/g, '<br>') : '<i>none</i>') + '</td></tr>';
+  h += '<tr><td>Detected card(s)</td><td>' + (d.cards.length ? d.cards.map(function(c) { return esc(c.slot) + ' (' + esc(c.profile) + ' model)'; }).join('<br>') : '<i>none</i>') + '</td></tr>';
+  h += '</table>';
+  document.getElementById('cmp-status').innerHTML = h;
+
+  var g = '';
+  if (!d.gpus.length) {
+    g = '<p><i>No GPU reported by the driver.</i></p>';
+  } else {
+    d.gpus.forEach(function(x) {
+      g += '<div class="cmp-gpu"><b>' + esc(x.index) + ': ' + esc(x.name) + '</b> <span class="cmp-dim">' + esc(x.bus) + '</span><br>';
+      g += 'Memory: <b>' + esc((x.memory_mib / 1024).toFixed(1)) + ' GiB</b> (' + esc(x.memory_mib) + ' MiB) ' + unlockChip(x) + '<br>';
+      g += 'PCIe link: gen ' + esc(x.gen_current) + ' now, max ' + esc(x.gen_max) + ' <span class="cmp-dim">(the link may idle at a lower gen)</span><br>';
+      g += 'ECC: ' + esc(x.ecc) + '</div>';
+    });
+  }
+  document.getElementById('cmp-gpus').innerHTML = g;
+
+  var hc = '<table class="cmp-table">';
+  hc += '<tr><td>Driver loaded</td><td>' + (d.module.version ? chip('OK', 'ok') : chip('No', 'bad')) + '</td></tr>';
+  hc += '<tr><td>GPU memory unlocked</td><td>' + (d.gpus.length && d.gpus.every(function(x) { return x.unlock === 'unlocked'; }) ? chip('OK', 'ok') : chip('No', 'bad')) + '</td></tr>';
+  hc += '<tr><td>Unlock marker in kernel log</td><td>' + (d.pma_ok ? chip('OK', 'ok') : chip('Not found', 'warn')) + ' <span class="cmp-dim">late PMA extension status=0x0</span></td></tr>';
+  hc += '<tr><td>Gen2 retrain log</td><td><code>' + (d.gen2_log ? esc(d.gen2_log).replace(/\n/g, '<br>') : 'no log') + '</code></td></tr>';
+  hc += '</table>';
+  document.getElementById('cmp-health').innerHTML = hc;
+
+  var u = '';
+  if (d.upgrade && d.upgrade.results && d.upgrade.results.length) {
+    u += '<table class="cmp-table">';
+    d.upgrade.results.forEach(function(r) {
+      var c = r.status === 'supported' ? chip('Supported - safe to upgrade', 'ok') : (r.status === 'unsupported' ? chip('NOT supported yet - do not upgrade', 'bad') : chip('Cannot verify', 'warn'));
+      u += '<tr><td>Unraid ' + esc(r.version) + ' <span class="cmp-dim">(' + esc(r.branch) + ', kernel ' + esc(r.kernel || '?') + ')</span></td><td>' + c + '</td></tr>';
+    });
+    u += '</table>';
+  } else if (d.upgrade) {
+    u = '<p>No newer Unraid release found for your branch.</p>';
+  } else {
+    u = '<p><i>Not checked yet.</i></p>';
+  }
+  document.getElementById('cmp-upgrade').innerHTML = u;
+
+  fillOptions(d);
+  renderBanners(d);
+}
+
+function uniq(a) { return a.filter(function(v, i) { return a.indexOf(v) === i; }); }
+function fillSelect(id, values, selected) {
+  var el = document.getElementById(id);
+  var opts = uniq(['latest'].concat(values));
+  if (selected && opts.indexOf(selected) < 0) opts.push(selected);
+  el.innerHTML = opts.map(function(v) { return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('');
+}
+function fillOptions(d) {
+  var a = d.available || [];
+  fillSelect('cmp-drv', a.map(function(p) { return p.driver; }).sort().reverse(), CMP_SETTINGS.driver_version);
+  fillSelect('cmp-ref', a.map(function(p) { return p.cmpunlocker; }).sort().reverse(), CMP_SETTINGS.cmpunlocker_ref);
+}
+
+function loadStatus(refresh) {
+  var url = CMP_BASE + 'status.php?_=' + Date.now() + (refresh ? '&refresh=' + refresh : '');
+  return fetch(url, {cache: 'no-store'})
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(renderStatus)
+    .catch(function(e) { document.getElementById('cmp-banners').innerHTML = banner('bad', 'Could not load status', esc(e.message)); });
+}
+function recheck() {
+  var b = document.getElementById('cmp-recheck'); b.disabled = true; b.value = 'Checking...';
+  loadStatus('force').then(function() { b.disabled = false; b.value = 'Re-check now'; });
+}
+function downloadPkg() {
+  openBox('/usr/local/emhttp/plugins/<?=$name?>/include/cmp.sh&arg1=download', 'Downloading driver package', 400, 700, true);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadStatus().then(function() { loadStatus(1); });
+});
+</script>
+
+<style>
+.cmp-wrap { display:flex; flex-wrap:wrap; gap:24px; justify-content:center; align-items:flex-start; }
+.cmp-col { flex:1 1 520px; max-width:760px; min-width:320px; }
+.cmp-table td { padding:4px 12px 4px 0; vertical-align:top; line-height:normal; }
+.cmp-table td:first-child { white-space:nowrap; opacity:.8; }
+.cmp-chip { display:inline-block; padding:1px 8px; border-radius:10px; font-size:.85em; color:#fff; }
+.cmp-ok { background:#2e8b3d; } .cmp-bad { background:#c0392b; } .cmp-warn { background:#b9770e; } .cmp-dim { opacity:.65; }
+span.cmp-chip.cmp-dim { background:#666; opacity:1; }
+.cmp-banner { padding:10px 14px; margin:8px 0; border-left:5px solid; border-radius:3px; }
+.cmp-b-bad { border-color:#c0392b; background:rgba(192,57,43,.12); }
+.cmp-b-warn { border-color:#b9770e; background:rgba(185,119,14,.12); }
+.cmp-gpu { margin:8px 0 14px; line-height:1.6; }
+.cmp-form td { padding:6px 12px 6px 0; vertical-align:top; line-height:normal; }
+.cmp-form select { min-width:180px; }
+.cmp-note { font-size:.9em; opacity:.8; margin:2px 0 0; }
+</style>
+
+<h1 style="text-align:center">CMP 170HX Unlock Driver</h1>
+
+<?php if ($saved): ?>
+<div class="cmp-banner cmp-b-warn" style="max-width:1100px;margin:8px auto"><b>Settings saved.</b> Click <i>Download package now</i> to fetch a changed driver version, then reboot to apply it.</div>
+<?php endif; ?>
+
+<div id="cmp-banners" style="max-width:1100px;margin:0 auto"></div>
+
+<div class="cmp-wrap">
+
+<div class="cmp-col">
+  <p><b><font size="+1">Status</font></b></p>
+  <div id="cmp-status"><i>Loading...</i></div>
+  <br>
+  <p><b><font size="+1">GPU</font></b></p>
+  <div id="cmp-gpus"><i>Loading...</i></div>
+  <p><b><font size="+1">Health checks</font></b></p>
+  <div id="cmp-health"><i>Loading...</i></div>
+  <br>
+  <p><b><font size="+1">Before you upgrade Unraid</font></b></p>
+  <div id="cmp-upgrade"><i>Loading...</i></div>
+  <p class="cmp-note">Unraid cannot let a plugin block an upgrade. Only upgrade when the new release shows as supported. If you upgrade anyway, the plugin installs nothing and starts normally; the driver comes back once support is published.</p>
+  <p><input type="button" id="cmp-recheck" value="Re-check now" onclick="recheck()">
+     <a class="button" href="/plugins/<?=$name?>/include/diag.php" style="margin-left:8px">Download diagnostics</a></p>
+</div>
+
+<div class="cmp-col">
+  <p><b><font size="+1">Settings</font></b></p>
+  <form method="post">
+    <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES)?>">
+    <table class="cmp-form">
+      <tr><td><b>Nvidia driver version</b></td><td>
+        <select id="cmp-drv" name="drv"><option value="<?=htmlspecialchars($cur['driver_version'])?>" selected><?=htmlspecialchars($cur['driver_version'])?></option></select>
+        <p class="cmp-note"><i>latest</i> follows new published versions (needs update notification on to download them automatically).</p></td></tr>
+      <tr><td><b>cmpunlocker version</b></td><td>
+        <select id="cmp-ref" name="ref"><option value="<?=htmlspecialchars($cur['cmpunlocker_ref'])?>" selected><?=htmlspecialchars($cur['cmpunlocker_ref'])?></option></select>
+        <p class="cmp-note">Only versions that were built and published for your kernel are listed.</p></td></tr>
+      <tr><td><b>Card profile</b></td><td>
+        <select name="profile">
+          <?php foreach (['auto' => 'Auto-detect', '8gb' => '8 GB model (10de:20c2)', '10gb' => '10 GB model (10de:2082)', 'mixed' => 'Both models installed'] as $v => $l): ?>
+          <option value="<?=$v?>" <?=$cur['card_profile'] === $v ? 'selected' : ''?>><?=$l?></option>
+          <?php endforeach; ?>
+        </select>
+        <p class="cmp-note">Leave on Auto-detect. A profile that contradicts the detected card is refused at boot.</p></td></tr>
+      <tr><td><b>PCIe Gen2 retrain</b></td><td>
+        <select name="gen2">
+          <option value="true" <?=$cur['gen2_enable'] === 'true' ? 'selected' : ''?>>Enabled</option>
+          <option value="false" <?=$cur['gen2_enable'] === 'false' ? 'selected' : ''?>>Disabled</option>
+        </select>
+        <p class="cmp-note">Reloads the driver once at boot and retrains the link to Gen2 (cmpunlocker hammer). Applies at next boot.</p></td></tr>
+      <tr><td><b>Update notifications</b></td><td>
+        <select name="notify">
+          <option value="true" <?=$cur['update_check'] === 'true' ? 'selected' : ''?>>Enabled</option>
+          <option value="false" <?=$cur['update_check'] === 'false' ? 'selected' : ''?>>Disabled</option>
+        </select>
+        <p class="cmp-note">Once a day (8-10 am): warns when a newer Unraid release is not supported, and downloads newer drivers if the version is set to <i>latest</i>. Reboot installs them.</p></td></tr>
+      <tr><td></td><td>
+        <input type="submit" name="cmp_save" value="Save settings">
+        <input type="button" value="Download package now" onclick="downloadPkg()">
+      </td></tr>
+    </table>
+  </form>
+  <br>
+  <p><b>How it works</b></p>
+  <p class="cmp-note">At every boot the plugin installs the patched Nvidia driver that matches your running Unraid kernel from the plugin's release page. The install never blocks boot: if no matching driver exists, nothing is installed and you are notified. A first install needs one <b>cold boot</b> (full power-off) before the card shows its unlocked memory.</p>
+  <p class="cmp-note">This plugin replaces the Nvidia Driver plugin; install only one of them.</p>
+</div>
+
+</div>

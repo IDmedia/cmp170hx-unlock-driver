@@ -1,0 +1,6 @@
+{
+  "min_kernel": "6.18.54",
+  "cmpunlocker": ["v0.5"],
+  "drivers_per_tag": 2,
+  "profiles": ["8gb", "10gb", "mixed"]
+}

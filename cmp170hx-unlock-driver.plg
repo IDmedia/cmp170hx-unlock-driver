@@ -1,0 +1,82 @@
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+  <!ENTITY name      "cmp170hx-unlock-driver">
+  <!ENTITY author    "IDmedia">
+  <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
+  <!ENTITY version   "2026.10.25">
+  <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
+  <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
+  <!ENTITY pluginURL "&gitURL;/&name;.plg">
+  <!ENTITY md5       "33e13d89d6665c152d826a3a3caa5bbf">
+  <!ENTITY plugin    "/boot/config/plugins/&name;">
+  <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
+]>
+
+<PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
+
+<CHANGES>
+
+###2026.10.25
+- Driver now comes as two packages: Nvidia userspace per driver version (kept across Unraid upgrades) and patched kernel modules per kernel, so an Unraid upgrade only downloads a small modules package
+- Supports kernels for which Unraid no longer publishes the selected driver version
+- Problem notifications repeat after a reboot if the problem persists
+
+###2026.10.12
+- Initial release: installs the patched Nvidia driver for the CMP 170HX per Unraid kernel, status page, Gen2 retrain, Docker/CDI support, upgrade-support warnings
+
+</CHANGES>
+
+<!-- Refuse a first install next to the Nvidia Driver plugin. On later boots (settings exist) never fail: the boot script reports the conflict instead. -->
+<FILE Run="/bin/bash">
+<INLINE>
+if [ -f /boot/config/plugins/nvidia-driver.plg ] || [ -f /var/log/plugins/nvidia-driver.plg ]; then
+  echo
+  echo "ERROR: the Nvidia Driver plugin is installed. It cannot run together with CMP 170HX Unlock Driver."
+  echo "Remove the Nvidia Driver plugin (and reboot), then install this plugin again."
+  echo
+  [ -f &plugin;/settings.cfg ] || exit 1
+fi
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+rm -f $(ls /boot/config/plugins/&name;/&name;*.txz 2>/dev/null | grep -v '&version;')
+</INLINE>
+</FILE>
+
+<FILE Name="/boot/config/plugins/&name;/&name;-&version;.txz" Run="upgradepkg --install-new">
+<URL>&gitURL;/packages/&name;-&version;.txz</URL>
+<MD5>&md5;</MD5>
+</FILE>
+
+<FILE Name="&emhttp;/README.md">
+<INLINE>
+**CMP 170HX Unlock Driver**
+
+Installs a patched Nvidia driver that unlocks the full memory of the CMP 170HX and makes it usable in Docker containers.
+The driver matching your Unraid kernel is installed at every boot. If none is published yet for a new Unraid version, nothing is installed and you are notified.
+This plugin replaces the Nvidia Driver plugin; install only one of them.
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash">
+<INLINE>
+bash &emhttp;/include/cmp.sh boot
+</INLINE>
+</FILE>
+
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+echo "----------------------------------------------"
+echo "---Uninstalling CMP 170HX Unlock Driver------"
+echo "----------------------------------------------"
+bash &emhttp;/include/cmp.sh uninstall
+removepkg &name;-&version;
+rm -rf &emhttp; &plugin;
+echo
+echo "CMP 170HX Unlock Driver removed. Please reboot your server (the loaded driver stays active until then)."
+echo
+</INLINE>
+</FILE>
+</PLUGIN>

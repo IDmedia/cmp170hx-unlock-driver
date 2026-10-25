@@ -1,0 +1,87 @@
+# CI for the CMP 170HX Unlock Driver. GitLab is authoritative; GitHub (a push mirror) hosts the plugin
+# and the driver packages users download.
+#
+# CI/CD variables (Settings > CI/CD > Variables, masked + protected):
+#   GITHUB_TOKEN   fine-grained GitHub token, IDmedia/cmp170hx-unlock-driver, Contents: read and write
+#   CI_PUSH_TOKEN  project access token, role Developer, scope write_repository (check-upstream MRs)
+# Pipeline schedule (Build > Pipeline schedules): every 6 hours on main, runs discover + check-upstream.
+
+variables:
+  GH_REPO: IDmedia/cmp170hx-unlock-driver
+  GH_TOKEN: $GITHUB_TOKEN
+
+stages: [test, discover, packages]
+
+default:
+  tags: [linux]    # the runner only picks up jobs tagged linux (also set in the generated child pipeline)
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
+# Builds and uploads only run on main, and only when something could have changed what is wanted.
+.publishing:
+  rules:
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "web"
+    - changes: [versions.json, ci/**/*, .gitlab-ci.yml]
+
+# ---------------------------------------------------------------- test (every push and MR)
+shellcheck:
+  stage: test
+  image: koalaman/shellcheck-alpine:v0.11.0
+  script:
+    - shellcheck -x -S warning ci/*.sh tests/*.sh source/makepkg-unraid.sh source/usr/local/emhttp/plugins/cmp170hx-unlock-driver/include/cmp.sh
+
+php-lint:
+  stage: test
+  image: php:8.3-cli-alpine
+  script:
+    - for f in $(find source -name '*.php' -o -name '*.page'); do php -l "$f"; done
+
+unit-tests:
+  stage: test
+  image: alpine:3.22
+  before_script:
+    - apk add --no-cache bash coreutils curl jq python3 util-linux xz tar
+  script:
+    - bash tests/cmp_test.sh
+    - bash tests/plugin_package_test.sh
+
+# ---------------------------------------------------------------- packages (main only)
+check-upstream:
+  stage: discover
+  image: alpine:3.22
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  before_script:
+    - apk add --no-cache bash coreutils curl git jq
+  script:
+    - bash ci/check-upstream.sh
+
+discover:
+  stage: discover
+  image: alpine:3.22
+  extends: .publishing
+  variables:
+    FORCE_KVER: ""    # set when running the pipeline by hand to rebuild one kernel, e.g. 6.18.58-Unraid
+  before_script:
+    - apk add --no-cache bash coreutils curl jq github-cli
+  script:
+    - bash ci/discover.sh packages.yml
+  artifacts:
+    paths: [packages.yml]
+
+packages:
+  stage: packages
+  extends: .publishing
+  needs: [discover]
+  trigger:
+    include:
+      - artifact: packages.yml
+        job: discover
+    strategy: depend

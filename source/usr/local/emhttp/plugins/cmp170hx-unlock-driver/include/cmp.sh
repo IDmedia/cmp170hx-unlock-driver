@@ -19,8 +19,9 @@ HAMMER="${CMP_HAMMER:-/usr/local/sbin/cmp-gen2-hammer}"
 SELF=/usr/local/emhttp/plugins/$NAME/include/cmp.sh
 NOTIFY="${CMP_NOTIFY:-/usr/local/emhttp/plugins/dynamix/scripts/notify}"
 UNRAID_RELEASES="${CMP_UNRAID_RELEASES:-https://releases.unraid.net/os}"
-# Driver packages are releases of a separate, non-mirrored repo (same name as GH_REPO in .gitlab-ci.yml).
-BASE="${CMP_BASE_URL:-https://github.com/IDmedia/cmp170hx-unlock-driver-packages/releases/download}"
+# The repo lives in one place: the "repo" entity of the .plg.
+REPO="${CMP_REPO:-$(sed -n 's/.*<!ENTITY repo *"\([^"]*\)".*/\1/p' "/boot/config/plugins/$NAME.plg" 2>/dev/null)}"
+BASE="${CMP_BASE_URL:-https://github.com/${REPO:-IDmedia/cmp170hx-unlock-driver}/releases/download}"
 # CMP_KVER simulates another kernel (testing the "unsupported" path); installs are skipped then.
 KVER="${CMP_KVER:-$(uname -r)}"
 DRY=0; [ "$KVER" = "$(uname -r)" ] || DRY=1

@@ -1,13 +1,13 @@
-# CI for the CMP 170HX Unlock Driver. GitLab is authoritative. Users get the plugin from the GitHub push
-# mirror and the driver packages from releases of a separate GitHub repo (GH_REPO), which no mirror touches.
+# CI for the CMP 170HX Unlock Driver. GitLab is authoritative; GitHub (a push mirror) hosts the plugin
+# and the driver packages users download.
 #
 # CI/CD variables (Settings > CI/CD > Variables, masked + protected):
-#   GITHUB_TOKEN   fine-grained GitHub token, IDmedia/cmp170hx-unlock-driver-packages, Contents: read and write
-#   CI_PUSH_TOKEN  project access token, role Developer, scope write_repository (check-upstream MRs)
+#   GITHUB_TOKEN   fine-grained GitHub token, IDmedia/cmp170hx-unlock-driver, Contents: read and write
+#   CI_PUSH_TOKEN  project access token, role Developer, scope write_repository (release tags, check-upstream MRs)
 # Pipeline schedule (Build > Pipeline schedules): every 6 hours on main, runs discover + check-upstream.
 
 variables:
-  GH_REPO: IDmedia/cmp170hx-unlock-driver-packages    # releases only; not the mirrored code repo (BASE in cmp.sh)
+  GH_REPO: IDmedia/cmp170hx-unlock-driver
   GH_TOKEN: $GITHUB_TOKEN
 
 stages: [test, discover, packages]

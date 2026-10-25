@@ -115,10 +115,8 @@ until then.
 
 ## How it is built
 
-The packages are built by GitLab CI on the maintainer's GitLab and published as releases of
-[IDmedia/cmp170hx-unlock-driver-packages](https://github.com/IDmedia/cmp170hx-unlock-driver-packages). That repo
-holds only releases; it is separate from this one because this one is a push mirror, and a mirror removes
-tags that exist only on GitHub.
+The packages are built by GitLab CI on the maintainer's GitLab and published as releases of this GitHub
+repository (a push mirror of the GitLab one):
 
 | Release tag | Contents |
 |---|---|
@@ -158,14 +156,15 @@ kernels that are already published. Nothing is ever deleted from a release by CI
 ### Maintainer setup (once)
 
 1. GitHub: push mirror from GitLab (*Settings > Repository > Mirroring repositories*) to
-   `https://github.com/IDmedia/cmp170hx-unlock-driver.git`, the repository users install the plugin from.
-2. GitHub: the public repository `IDmedia/cmp170hx-unlock-driver-packages`, initialised with a README (releases
-   need a commit to tag). CI only creates releases there; nothing pushes to it.
-3. GitLab CI/CD variables (masked, protected):
-   - `GITHUB_TOKEN`: fine-grained GitHub token for `IDmedia/cmp170hx-unlock-driver-packages`, *Contents: read and write*.
-   - `CI_PUSH_TOKEN`: project access token, role Developer, scope `write_repository` (for check-upstream).
-4. GitLab pipeline schedule on `main`, e.g. every 6 hours (`17 */6 * * *`).
-5. Runner: tagged `linux`, any Docker executor with ~10 GB free disk. No privileged mode, no access to the Unraid servers.
+   `https://github.com/IDmedia/cmp170hx-unlock-driver.git`. CI creates every release tag in GitLab first
+   (`ci/release-tag.sh`), so the mirror carries the tags; a tag that existed only on GitHub would be deleted by
+   the mirror and its release would turn into a draft. Don't delete these tags in GitLab.
+2. GitLab CI/CD variables (masked, protected):
+   - `GITHUB_TOKEN`: fine-grained GitHub token for `IDmedia/cmp170hx-unlock-driver`, *Contents: read and write*.
+   - `CI_PUSH_TOKEN`: project access token, role Developer, scope `write_repository` (release tags in GitLab,
+     check-upstream merge requests).
+3. GitLab pipeline schedule on `main`, e.g. every 6 hours (`17 */6 * * *`).
+4. Runner: tagged `linux`, any Docker executor with ~10 GB free disk. No privileged mode, no access to the Unraid servers.
 
 ### Day to day
 
@@ -173,7 +172,8 @@ kernels that are already published. Nothing is ever deleted from a release by CI
   `.plg`, run `bash source/makepkg-unraid.sh <version>` on Linux or WSL, and commit `packages/` and the `.plg`.
   CI fails if you forget.
 - Rebuild one kernel: *Build > Pipelines > Run pipeline* on `main` with `FORCE_KVER=6.18.58-Unraid`.
-- The packages repository name lives in two places: `GH_REPO` in `.gitlab-ci.yml` and `BASE` in `cmp.sh`.
+- The GitHub repository name lives in two places: the `repo` entity in the `.plg` and `GH_REPO` in
+  `.gitlab-ci.yml`.
 
 ### Manual check on a server without a CMP 170HX
 

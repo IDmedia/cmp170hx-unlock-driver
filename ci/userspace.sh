@@ -3,7 +3,7 @@
 # Unraid's stock unraid-nvidia-driver package (libraries, firmware, container toolkit) without its
 # kernel modules. Any kernel's stock package will do, so a driver stays buildable after Unraid stops
 # publishing it for new kernels. Does nothing if the release is complete (has userspace.json, uploaded last).
-# Usage: ci/userspace.sh <driver>      Needs: gh (GH_TOKEN, GH_REPO), jq, curl, xz, GNU tar. Run as root.
+# Usage: ci/userspace.sh <driver>      Needs: gh (GH_TOKEN, GH_REPO), git, jq, curl, xz, GNU tar. Run as root.
 set -euo pipefail
 DRV="${1:?driver version}"
 TAG="nvidia-$DRV"
@@ -14,7 +14,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx userspace.json; then
   echo "$TAG already published"; exit 0
 fi
-gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true    # leftover of an interrupted run
+gh release delete "$TAG" --yes 2>/dev/null || true    # leftover of an interrupted run (the tag stays)
 
 # newest Unraid kernel release that has this driver (no "| head": gh would die of SIGPIPE under pipefail)
 src="$(gh api --paginate repos/unraid/unraid-nvidia-driver/releases \
@@ -46,7 +46,8 @@ jq -n --arg f "$PKG" --arg p "$TAG/$PKG" --arg d "$DRV" --arg s "$src" --arg m "
   --arg h "$(sha256sum "$WORK/$PKG" | cut -d' ' -f1)" --argjson z "$(stat -c %s "$WORK/$PKG")" \
   '{file:$f, path:$p, driver:$d, source_kernel:$s, md5:$m, sha256:$h, size:$z}' > "$WORK/userspace.json"
 
-gh release create "$TAG" --target main --title "Nvidia $DRV userspace" \
+bash "$(dirname "$0")/release-tag.sh" "$TAG"
+gh release create "$TAG" --target "$CI_COMMIT_SHA" --title "Nvidia $DRV userspace" \
   --notes "Nvidia $DRV userspace (libraries, firmware, container toolkit) taken from the stock unraid-nvidia-driver package $stock with its kernel modules removed. Installed by the CMP 170HX Unlock Driver plugin together with a modules package from a kernel release; do not install by hand." \
   "$WORK/$PKG" "$WORK/$PKG.md5"
 gh release upload "$TAG" "$WORK/userspace.json"

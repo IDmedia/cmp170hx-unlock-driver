@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.25b">
+  <!ENTITY version   "2026.10.25c">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "3e3148f24ac26acca6fa59a2338528b9">
+  <!ENTITY md5       "409af988e03619025e54c3862d53ac42">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -16,8 +16,8 @@
 
 <CHANGES>
 
-###2026.10.25b
-- Driver packages are downloaded from IDmedia/cmp170hx-unlock-driver-packages
+###2026.10.25c
+- Driver packages are downloaded from this repository's releases again (2026.10.25b pointed to a separate repository)
 
 ###2026.10.25a
 - Status page: a driver that is installed but whose kernel module does not load is shown as such, not as a failed install

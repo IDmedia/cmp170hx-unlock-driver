@@ -106,7 +106,7 @@ default:
 .gh:
   image: alpine:3.22
   before_script:
-    - apk add --no-cache bash coreutils curl jq tar xz github-cli
+    - apk add --no-cache bash coreutils curl git jq tar xz github-cli
 EOF
   for drv in $(sort -u "$WORK/userspace"); do
     cat <<EOF

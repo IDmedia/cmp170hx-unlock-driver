@@ -2,7 +2,7 @@
 # Adds the modules packages built in out/<kver>/ to the GitHub release <kver> and merges them into its
 # manifest.json. Existing packages stay; manifest.json is uploaded last, so it only lists packages whose
 # files are already downloadable, and every listed driver has a published userspace release.
-# Usage: ci/publish.sh <kver>      Needs: gh (GH_TOKEN, GH_REPO), jq.
+# Usage: ci/publish.sh <kver>      Needs: gh (GH_TOKEN, GH_REPO), git, jq.
 set -euo pipefail
 KVER="${1:?kver}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,7 +13,8 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 ls "$OUT"/*.txz.json >/dev/null 2>&1 || die "nothing built in $OUT"
 
 if ! gh release view "$KVER" >/dev/null 2>&1; then
-  gh release create "$KVER" --target main --title "$KVER" \
+  bash "$(dirname "$0")/release-tag.sh" "$KVER"
+  gh release create "$KVER" --target "$CI_COMMIT_SHA" --title "$KVER" \
     --notes "Patched Nvidia kernel modules for Unraid kernel ${KVER}, built from cmpunlocker (GPL-2.0, https://github.com/amoghmunikote/cmpunlocker) on NVIDIA open-gpu-kernel-modules. manifest.json lists them with their userspace packages. Installed by the CMP 170HX Unlock Driver plugin; do not install by hand."
 fi
 gh release download "$KVER" -p manifest.json -O "$WORK/old.json" 2>/dev/null || echo '{"packages":[]}' > "$WORK/old.json"

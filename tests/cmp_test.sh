@@ -130,6 +130,19 @@ CMP_UNRAID_VERSION=7.3.4 bash "$CMP" check >/dev/null 2>&1
 check "daily check: newer driver pre-downloaded"    [ -f "$T/flash/packages/$KVER/cmp170hx-modules-615.78.08-v0.6-8gb-$KVER-1.txz" ]
 check "daily check: old packages dropped"           [ -z "$(find "$T/flash/packages" -name '*615.71.09*')" ]
 
+# upgrade check: the next release's kernel comes from its changelog (7.3.4 only names it in the zfs line)
+upgrade_to() { # <changelog line> -> status of the newer release
+  rm -rf "$T/run"
+  printf '{"version":"7.3.4","isNewer":true,"changelog":"%s/7.3.4.md"}' "$CMP_BASE_URL" > "$T/www/os"
+  printf '# Version 7.3.4\n* php: version 8.4.26 -> 8.4.27\n%s\n' "$1" > "$T/www/7.3.4.md"
+  CMP_UNRAID_VERSION=7.3.3 bash "$CMP" upgrade-check >/dev/null 2>&1
+  jq -r '.results[0] | "\(.kernel) \(.status)"' "$T/run/upgrade.json"
+}
+reset; mkdir -p "$T/www/6.18.58-Unraid"; echo '{"packages":[{"file":"x"}]}' > "$T/www/6.18.58-Unraid/manifest.json"
+check "upgrade check: kernel from zfs line, supported" [ "$(upgrade_to '* zfs: version 2.4.4_6.18.54_Unraid-1_LT -> 2.4.4_6.18.58_Unraid-1_LT')" = "6.18.58-Unraid supported" ]
+check "upgrade check: unpublished kernel, unsupported" [ "$(upgrade_to '### Linux kernel'$'\n''* version 6.18.60')" = "6.18.60-Unraid unsupported" ]
+check "upgrade check: no kernel in changelog, unknown" [ "$(upgrade_to '* curl: version 8.22 -> 8.23')" = " unknown" ]
+
 reset; card 8gb; publish 615.71.09 v0.5 8gb; mkdir -p "$T/flash"
 check "set: rejects bad values"                     not bash "$CMP" set card_profile 12gb 2>/dev/null
 check "set: rejects unknown keys"                   not bash "$CMP" set foo bar 2>/dev/null

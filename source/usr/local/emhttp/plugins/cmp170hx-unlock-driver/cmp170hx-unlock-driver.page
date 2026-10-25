@@ -38,7 +38,12 @@ function renderBanners(d) {
   if (d.conflict) {
     h += banner('bad', 'Plugin conflict', 'The Nvidia Driver plugin is installed. It cannot run together with this plugin: remove one of them and reboot. No patched driver is installed while both are present.');
   }
-  if (st === 'unsupported') {
+  // the boot state is from the last boot; support published since then turns it into a "ready" message
+  if ((st === 'unsupported' || st === 'unknown') && d.kernel_support === 'supported') {
+    h += banner('warn', 'Patched driver now available', d.cached_package
+      ? 'The driver for kernel ' + esc(d.kernel) + ' is downloaded. Reboot to install it (a full power-off the first time, so the card unlocks).'
+      : 'A patched driver for kernel ' + esc(d.kernel) + ' has been published since the last boot. Click <i>Download package now</i>, then reboot (a full power-off the first time, so the card unlocks).');
+  } else if (st === 'unsupported') {
     h += banner('bad', 'Kernel ' + d.kernel + ' is not supported yet', 'No patched driver is published for this Unraid version, so <b>no GPU driver was installed</b>. Your array and Docker are unaffected. The driver installs automatically after support is published: reboot then, or use <i>Re-check now</i>. Your settings are kept.');
   } else if (st === 'unknown') {
     h += banner('warn', 'Driver not installed', 'The release server could not be reached at boot, so nothing was installed. Check your internet connection and reboot.');

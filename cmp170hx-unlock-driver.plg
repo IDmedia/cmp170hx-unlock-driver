@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.25d">
+  <!ENTITY version   "2026.10.25e">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "5802b05fdc1f93ce3c9a531fb6e320d0">
+  <!ENTITY md5       "649ffe3eef923b24ea96e79046621ed1">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -15,6 +15,10 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
 
 <CHANGES>
+
+###2026.10.25e
+- Status page: once a driver is published for the running kernel, the "not supported" banner turns into a "now available" one
+- Upgrade check: finds the kernel of releases whose notes only name it in package versions (e.g. 7.3.4)
 
 ###2026.10.25d
 - Settings: version dropdowns show "Latest" instead of "latest"

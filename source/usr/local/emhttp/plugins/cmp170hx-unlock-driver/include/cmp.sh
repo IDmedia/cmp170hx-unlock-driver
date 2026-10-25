@@ -307,11 +307,13 @@ cmd_download() {
 
 # Which kernel does an Unraid release ship? Reads its changelog: the first version number within a few
 # lines of a "Linux kernel" heading (stable .md and next .txt both use that heading), else a
-# "Linux kernel X.Y.Z" sentence.
+# "Linux kernel X.Y.Z" sentence, else the new kernel in the version of a package built per kernel
+# (e.g. "zfs: version 2.4.4_6.18.54_Unraid-1_LT -> 2.4.4_6.18.58_Unraid-1_LT"; 7.3.4 only says it there).
 release_kernel() { # <changelog-url>
   local t k; t="$(curl -sSL --max-time 20 "$1" 2>/dev/null)" || return 1
   k="$(awk 'tolower($0) ~ /^#+ *linux kernel/ {f=5; next} f>0 {print; f--}' <<<"$t" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
   [ -n "$k" ] || k="$(grep -ioE 'linux kernel [0-9]+\.[0-9]+\.[0-9]+' <<<"$t" | head -1 | grep -oE '[0-9.]+$')"
+  [ -n "$k" ] || k="$(grep -m1 -E '_Unraid.*->' <<<"$t" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+_Unraid' | tail -1 | cut -d_ -f1)"
   [ -n "$k" ] && echo "$k-Unraid"
 }
 

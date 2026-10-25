@@ -15,7 +15,8 @@ stub() { printf '#!/bin/bash\n%s\n' "$2" > "$T/bin/$1"; chmod +x "$T/bin/$1"; }
 stub lspci      'cat "$TEST_DIR/lspci" 2>/dev/null'
 stub installpkg 'echo "$(basename "$1")" >> "$TEST_DIR/installed"'
 stub modinfo    'grep -q . "$TEST_DIR/installed" 2>/dev/null'     # "installed" once a package was installed
-for c in modprobe rmmod depmod logger nvidia-ctk; do stub "$c" 'exit 0'; done
+for c in rmmod depmod logger nvidia-ctk; do stub "$c" 'exit 0'; done
+stub modprobe   '[ ! -f "$TEST_DIR/no_gpu_driver" ]'      # touch no_gpu_driver: the module fails to load
 stub crontab    'if [ "${1:-}" = -l ]; then cat "$TEST_DIR/crontab" 2>/dev/null; else cat > "$TEST_DIR/crontab"; fi'
 export PATH="$T/bin:$PATH" TEST_DIR="$T"
 export CMP_PLUGIN_DIR="$T/flash" CMP_RUN_DIR="$T/run" CMP_ETC="$T/etc" CMP_HAMMER="$T/none" \
@@ -49,7 +50,7 @@ publish() {
     "$T/www/$KVER/manifest.json" > "$T/m" && mv "$T/m" "$T/www/$KVER/manifest.json"
 }
 
-reset() { (cd "$T" && rm -rf flash run etc www/* installed notifications crontab lspci); }
+reset() { (cd "$T" && rm -rf flash run etc www/* installed notifications crontab lspci no_gpu_driver); }
 card() { case "$1" in 8gb) echo '01:00.0 3D controller [0302]: NVIDIA Corporation GA100 [10de:20c2] (rev a1)' ;;
                       10gb) echo '02:00.0 3D controller [0302]: NVIDIA Corporation GA100 [10de:2082] (rev a1)' ;; esac >> "$T/lspci"; }
 boot() { bash "$CMP" boot >/dev/null 2>&1; }
@@ -113,6 +114,14 @@ reset; card 8gb; publish 615.71.09 v0.5 8gb 10gb
 mkdir -p "$T/flash"; printf 'card_profile=10gb\n' > "$T/flash/settings.cfg"
 boot
 check "profile contradicting the card: refused"     [ "$(state)" = profile_mismatch ] && [ ! -s "$T/installed" ]
+
+reset; publish 615.71.09 v0.5 8gb; touch "$T/no_gpu_driver"     # no card, profile forced (manual test on Hisa)
+mkdir -p "$T/flash"; printf 'card_profile=8gb\n' > "$T/flash/settings.cfg"
+boot
+check "forced profile, no card: packages installed" installed "cmp170hx-nvidia-615.71.09-x86_64-1.txz cmp170hx-modules-615.71.09-v0.5-8gb-$KVER-1.txz "
+check "forced profile, no card: not_loaded state"   [ "$(state)" = not_loaded ]
+boot
+check "running boot again: still not_loaded"        [ "$(state)" = not_loaded ]
 
 reset; card 8gb; publish 615.71.09 v0.5 8gb; boot
 rm -rf "$T/run" "$T/installed"; echo 'driver_version=latest' >> "$T/flash/settings.cfg"

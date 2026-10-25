@@ -217,9 +217,6 @@ install_pkg() { # <userspace file> <modules file>
   else
     rm -f "$ETC/modprobe.d/cmp-pcie-gen2.conf"
   fi
-  modprobe nvidia >/dev/null 2>&1 || return 1
-  if [ "$(cfg_get gen2_enable)" = true ] && [ -x "$HAMMER" ]; then gen2_apply; fi
-  return 0
 }
 
 cmd_boot() {
@@ -269,11 +266,19 @@ cmd_boot() {
   fi
   [ "$DRY" = 1 ] && { log "[dry-run] would install $pkg"; return 0; }
 
+  local fresh=0
   if modinfo nvidia >/dev/null 2>&1; then
     log "nvidia module already installed, not reinstalling"
   else
-    install_pkg "$us" "$pkg" || { set_state error "install failed"; log "installing $pkg failed"; notify_once alert "CMP 170HX driver install failed" "Installing the patched driver failed. See the system log and Download diagnostics on the plugin page."; return 0; }
+    install_pkg "$us" "$pkg" || { set_state error "driver packages could not be installed"; log "installing $us / $pkg failed"; notify_once alert "CMP 170HX driver not installed" "Installing the patched driver packages failed. See the system log and Download diagnostics on the plugin page."; return 0; }
+    fresh=1
   fi
+  if ! modprobe nvidia >/dev/null 2>&1; then
+    set_state not_loaded "$(basename "$pkg")"; log "driver installed, but the nvidia module did not load"
+    notify_once alert "CMP 170HX driver not loaded" "The patched driver is installed, but the nvidia kernel module did not load. Without a CMP 170HX in the server (e.g. a forced card profile) this is expected; otherwise see Download diagnostics on the plugin page."
+    return 0
+  fi
+  if [ "$fresh" = 1 ] && [ "$(cfg_get gen2_enable)" = true ] && [ -x "$HAMMER" ]; then gen2_apply; fi
   post_install
   set_state installed "$(basename "$pkg")"
   if [ "$(cfg_get first_installation)" = true ]; then

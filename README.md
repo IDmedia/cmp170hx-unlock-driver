@@ -178,7 +178,7 @@ kernels that are already published. Nothing is ever deleted from a release by CI
 
 Install the `.plg`, open the settings page (status, upgrade check, version lists), then set *Card profile* to
 8 GB and reboot. The plugin downloads, verifies and installs both packages; `nvidia-smi` and `nvidia-ctk`
-exist, and only loading the module fails, so the page reports *install failed*. Remove the plugin afterwards
+exist, and only loading the module fails, so the page reports *Driver installed but not loaded*. Remove the plugin afterwards
 and reboot.
 
 ## Credits and licenses

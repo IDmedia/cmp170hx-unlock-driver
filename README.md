@@ -157,7 +157,7 @@ kernels that are already published. Nothing is ever deleted from a release by CI
 
 1. GitHub: push mirror from GitLab (*Settings > Repository > Mirroring repositories*) to
    `https://github.com/IDmedia/cmp170hx-unlock-driver.git`. CI creates every release tag in GitLab first
-   (`ci/release-tag.sh`), so the mirror carries the tags; a tag that existed only on GitHub would be deleted by
+   (`ci/prepare-release.sh`), so the mirror carries the tags; a tag that existed only on GitHub would be deleted by
    the mirror and its release would turn into a draft. Don't delete these tags in GitLab.
 2. GitLab CI/CD variables (masked, protected):
    - `GITHUB_TOKEN`: fine-grained GitHub token for `IDmedia/cmp170hx-unlock-driver`, *Contents: read and write*.

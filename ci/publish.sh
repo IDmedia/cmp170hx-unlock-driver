@@ -11,13 +11,14 @@ WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 ls "$OUT"/*.txz.json >/dev/null 2>&1 || die "nothing built in $OUT"
+PUBLIC="https://github.com/$GH_REPO/releases/download"    # what the plugin sees: published releases only
 
+bash "$(dirname "$0")/prepare-release.sh" "$KVER"
 if ! gh release view "$KVER" >/dev/null 2>&1; then
-  bash "$(dirname "$0")/release-tag.sh" "$KVER"
   gh release create "$KVER" --target "$CI_COMMIT_SHA" --title "$KVER" \
     --notes "Patched Nvidia kernel modules for Unraid kernel ${KVER}, built from cmpunlocker (GPL-2.0, https://github.com/amoghmunikote/cmpunlocker) on NVIDIA open-gpu-kernel-modules. manifest.json lists them with their userspace packages. Installed by the CMP 170HX Unlock Driver plugin; do not install by hand."
 fi
-gh release download "$KVER" -p manifest.json -O "$WORK/old.json" 2>/dev/null || echo '{"packages":[]}' > "$WORK/old.json"
+curl -fsSL -o "$WORK/old.json" "$PUBLIC/$KVER/manifest.json" 2>/dev/null || echo '{"packages":[]}' > "$WORK/old.json"
 
 # new entries replace old ones with the same file name
 jq -s '[.[0].packages[], .[1:][]] | reverse | unique_by(.file) | sort_by(.driver, .cmpunlocker, .profile)' \
@@ -25,7 +26,7 @@ jq -s '[.[0].packages[], .[1:][]] | reverse | unique_by(.file) | sort_by(.driver
 
 echo '{}' > "$WORK/userspace.json"
 for drv in $(jq -r '.[].driver' "$WORK/packages.json" | sort -u); do
-  gh release download "nvidia-$drv" -p userspace.json -O "$WORK/u.json" --clobber || die "userspace release nvidia-$drv is not published"
+  curl -fsSL -o "$WORK/u.json" "$PUBLIC/nvidia-$drv/userspace.json" || die "userspace release nvidia-$drv is not published"
   jq --arg d "$drv" --slurpfile u "$WORK/u.json" '.[$d] = $u[0]' "$WORK/userspace.json" > "$WORK/tmp" && mv "$WORK/tmp" "$WORK/userspace.json"
 done
 

@@ -45,7 +45,8 @@ fi
 for kver in $KERNELS; do
   [ "$(printf '%s\n%s\n' "$MIN" "${kver%%-*}" | sort -V | head -1)" = "$MIN" ] || continue
   have=""
-  [ -n "${FORCE_KVER:-}" ] || have="$(gh release download "$kver" -p manifest.json -O - 2>/dev/null \
+  # published manifests only, as the plugin sees them (gh would also find drafts)
+  [ -n "${FORCE_KVER:-}" ] || have="$(curl -fsSL "https://github.com/$GH_REPO/releases/download/$kver/manifest.json" 2>/dev/null \
     | jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' || true)"
   builds=""
   while read -r drv ref; do

@@ -11,9 +11,10 @@ PKG="cmp170hx-nvidia-${DRV}-x86_64-1.txz"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 die() { echo "ERROR: $*" >&2; exit 1; }
 
-if gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx userspace.json; then
+if curl -fsSLI -o /dev/null "https://github.com/$GH_REPO/releases/download/$TAG/userspace.json"; then
   echo "$TAG already published"; exit 0
 fi
+bash "$(dirname "$0")/prepare-release.sh" "$TAG"
 gh release delete "$TAG" --yes 2>/dev/null || true    # leftover of an interrupted run (the tag stays)
 
 # newest Unraid kernel release that has this driver (no "| head": gh would die of SIGPIPE under pipefail)
@@ -46,7 +47,6 @@ jq -n --arg f "$PKG" --arg p "$TAG/$PKG" --arg d "$DRV" --arg s "$src" --arg m "
   --arg h "$(sha256sum "$WORK/$PKG" | cut -d' ' -f1)" --argjson z "$(stat -c %s "$WORK/$PKG")" \
   '{file:$f, path:$p, driver:$d, source_kernel:$s, md5:$m, sha256:$h, size:$z}' > "$WORK/userspace.json"
 
-bash "$(dirname "$0")/release-tag.sh" "$TAG"
 gh release create "$TAG" --target "$CI_COMMIT_SHA" --title "Nvidia $DRV userspace" \
   --notes "Nvidia $DRV userspace (libraries, firmware, container toolkit) taken from the stock unraid-nvidia-driver package $stock with its kernel modules removed. Installed by the CMP 170HX Unlock Driver plugin together with a modules package from a kernel release; do not install by hand." \
   "$WORK/$PKG" "$WORK/$PKG.md5"

@@ -1,17 +1,15 @@
 # CMP 170HX Unlock Driver
 
-> **WARNING: NOT STABLE, STILL IN TESTING**
->
-> This plugin is under active development and has not been fully tested on real hardware yet. Expect bugs and
-> breaking changes. Do not rely on it for anything important, and keep a way to get your server back up without
-> it. Reports are welcome, but please include the diagnostics file from the plugin page.
-
 An Unraid plugin that installs a patched Nvidia driver for the **CMP 170HX**, unlocking the card's full memory
 and making it usable from Docker containers. The patches come from
 [cmpunlocker](https://github.com/amoghmunikote/cmpunlocker).
 
 The plugin installs the driver that matches your running Unraid kernel at every boot, shows the unlock status on
 a settings page, and tells you before an Unraid upgrade would leave the card without a driver.
+
+![The plugin's settings page with an unlocked 8 GB card: 64 GiB memory, PCIe gen 2, ECC enabled](docs/status-page.png)
+
+Problems? Use *Download diagnostics* on the plugin page and include the file in your report.
 
 ## Requirements
 

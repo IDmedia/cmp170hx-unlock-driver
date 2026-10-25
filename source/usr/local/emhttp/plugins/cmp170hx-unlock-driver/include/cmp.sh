@@ -169,7 +169,7 @@ fetch() {
   if pkg_ok "$dir/$file"; then log "package $file already cached"; return 0; fi
   need=$((size / 1048576 + 50)); free="$(df -m "$PLUGIN" | awk 'NR==2{print $4}')"
   [ "$free" -gt "$need" ] || { log "only ${free}MB free on /boot, need ${need}MB"; return 1; }
-  log "downloading $file"
+  log "downloading $file ($(((size + 1048575) / 1048576)) MB)"
   curl -sSL --fail --max-time 1800 -o "$dir/$file.part" "$BASE/$(jq -r .path <<<"$e")" || { rm -f "$dir/$file.part"; return 1; }
   if [ "$(md5sum "$dir/$file.part" | cut -d' ' -f1)" != "$md5" ] || \
      [ "$(sha256sum "$dir/$file.part" | cut -d' ' -f1)" != "$sha" ]; then
@@ -180,9 +180,28 @@ fetch() {
 
 # download_pick: fetch PICK and PICK_USERSPACE; only once both are verified, drop every other cached package.
 download_pick() {
-  local mod us
-  fetch "$PICK" "$PKGS/$KVER" && fetch "$PICK_USERSPACE" "$PKGS/nvidia" || return 1
+  local mod us bytes=0 mb
   mod="$(jq -r .file <<<"$PICK")"; us="$(jq -r .file <<<"$PICK_USERSPACE")"
+  pkg_ok "$PKGS/$KVER/$mod" || bytes=$((bytes + $(jq -r .size <<<"$PICK")))
+  pkg_ok "$PKGS/nvidia/$us" || bytes=$((bytes + $(jq -r .size <<<"$PICK_USERSPACE")))
+  mb=$(((bytes + 1048575) / 1048576))
+  # Shown in the plugin install/update window and in "Download package now": closing it early stops the
+  # download (nothing breaks, the next boot or click starts over), so say so before a long download.
+  [ "$mb" -gt 0 ] && cat <<EOF
+
++==============================================================================
+| WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING - WARNING
+|
+| Downloading the CMP 170HX driver: about ${mb} MB, this can take a few minutes.
+| Do NOT close this window or leave this page until the download has finished
+| ("Download finished and verified") and the log has stopped.
+| If it is interrupted, nothing breaks: the next try starts the download over.
+|
++==============================================================================
+
+EOF
+  fetch "$PICK" "$PKGS/$KVER" && fetch "$PICK_USERSPACE" "$PKGS/nvidia" || return 1
+  [ "$mb" -gt 0 ] && echo "Download finished and verified."
   find "$PKGS/$KVER" -type f ! -name "$mod" ! -name "$mod.*" -delete
   find "$PKGS/nvidia" -type f ! -name "$us" ! -name "$us.*" -delete
   find "$PKGS" -mindepth 1 -maxdepth 1 -type d ! -name "$KVER" ! -name nvidia -exec rm -rf {} + 2>/dev/null

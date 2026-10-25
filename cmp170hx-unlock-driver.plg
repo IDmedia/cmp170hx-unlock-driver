@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.25c">
+  <!ENTITY version   "2026.10.25d">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "409af988e03619025e54c3862d53ac42">
+  <!ENTITY md5       "5802b05fdc1f93ce3c9a531fb6e320d0">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -15,6 +15,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
 
 <CHANGES>
+
+###2026.10.25d
+- Settings: version dropdowns show "Latest" instead of "latest"
 
 ###2026.10.25c
 - Driver packages are downloaded from this repository's releases again (2026.10.25b pointed to a separate repository)

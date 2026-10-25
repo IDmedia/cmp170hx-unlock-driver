@@ -124,7 +124,7 @@ function fillSelect(id, values, selected) {
   var el = document.getElementById(id);
   var opts = uniq(['latest'].concat(values));
   if (selected && opts.indexOf(selected) < 0) opts.push(selected);
-  el.innerHTML = opts.map(function(v) { return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + esc(v) + '</option>'; }).join('');
+  el.innerHTML = opts.map(function(v) { return '<option value="' + esc(v) + '"' + (v === selected ? ' selected' : '') + '>' + (v === 'latest' ? 'Latest' : esc(v)) + '</option>'; }).join('');
 }
 function fillOptions(d) {
   var a = d.available || [];
@@ -203,10 +203,10 @@ span.cmp-chip.cmp-dim { background:#666; opacity:1; }
     <input type="hidden" name="csrf_token" value="<?=htmlspecialchars($var['csrf_token'] ?? '', ENT_QUOTES)?>">
     <table class="cmp-form">
       <tr><td><b>Nvidia driver version</b></td><td>
-        <select id="cmp-drv" name="drv"><option value="<?=htmlspecialchars($cur['driver_version'])?>" selected><?=htmlspecialchars($cur['driver_version'])?></option></select>
-        <p class="cmp-note"><i>latest</i> follows new published versions (needs update notification on to download them automatically).</p></td></tr>
+        <select id="cmp-drv" name="drv"><option value="<?=htmlspecialchars($cur['driver_version'])?>" selected><?=$cur['driver_version'] === 'latest' ? 'Latest' : htmlspecialchars($cur['driver_version'])?></option></select>
+        <p class="cmp-note"><i>Latest</i> follows new published versions (needs update notifications on to download them automatically). Only versions published for your kernel are listed.</p></td></tr>
       <tr><td><b>cmpunlocker version</b></td><td>
-        <select id="cmp-ref" name="ref"><option value="<?=htmlspecialchars($cur['cmpunlocker_ref'])?>" selected><?=htmlspecialchars($cur['cmpunlocker_ref'])?></option></select>
+        <select id="cmp-ref" name="ref"><option value="<?=htmlspecialchars($cur['cmpunlocker_ref'])?>" selected><?=$cur['cmpunlocker_ref'] === 'latest' ? 'Latest' : htmlspecialchars($cur['cmpunlocker_ref'])?></option></select>
         <p class="cmp-note">Only versions that were built and published for your kernel are listed.</p></td></tr>
       <tr><td><b>Card profile</b></td><td>
         <select name="profile">
@@ -226,7 +226,7 @@ span.cmp-chip.cmp-dim { background:#666; opacity:1; }
           <option value="true" <?=$cur['update_check'] === 'true' ? 'selected' : ''?>>Enabled</option>
           <option value="false" <?=$cur['update_check'] === 'false' ? 'selected' : ''?>>Disabled</option>
         </select>
-        <p class="cmp-note">Daily (8-10 am): warns before an unsupported Unraid upgrade and, with <i>latest</i>, downloads newer drivers for the next reboot.</p></td></tr>
+        <p class="cmp-note">Daily (8-10 am): warns before an unsupported Unraid upgrade and, with <i>Latest</i>, downloads newer drivers for the next reboot.</p></td></tr>
       <tr><td></td><td>
         <input type="submit" name="cmp_save" value="Save settings">
         <input type="button" value="Download package now" onclick="downloadPkg()">

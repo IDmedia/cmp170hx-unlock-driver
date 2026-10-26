@@ -65,7 +65,12 @@ $out['module'] = [
     'version' => sh("modinfo nvidia | awk '/^version:/{print \$2; exit}'"),
     'license' => sh("modinfo nvidia | awk -F': *' '/^license:/{print \$2; exit}'"),
 ];
-$out['pma_ok']   = (int)sh('dmesg | grep -c "late PMA extension status=0x0"') > 0;
+// The marker is printed once per boot and can rotate out of dmesg; remember it once seen ($run is cleared on reboot)
+$out['pma_ok']   = file_exists("$run/pma-seen");
+if (!$out['pma_ok'] && (int)sh('dmesg | grep -c "late PMA extension status=0x0"') > 0) {
+    $out['pma_ok'] = true;
+    @touch("$run/pma-seen");
+}
 $out['gen2_log'] = sh('tail -n 3 /var/log/gen2.log');
 $out['installed_package'] = sh('ls /var/log/packages | grep -E "^cmp170hx-(nvidia|modules)-"');
 $pkgs = "/boot/config/plugins/$name/packages";

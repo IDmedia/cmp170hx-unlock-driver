@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.25g">
+  <!ENTITY version   "2026.10.26">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "95dbbd8d05e608af363ed90cbccc6bef">
+  <!ENTITY md5       "38ac375974c07d168262314f03a974c2">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -15,6 +15,9 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
 
 <CHANGES>
+
+###2026.10.26
+- Unlock marker check remembers the marker once seen, so it no longer shows Not found after long uptime
 
 ###2026.10.25g
 - Large warning not to close the window while the driver downloads (plugin install/update and Download package now), with the download size

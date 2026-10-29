@@ -1,6 +1,6 @@
 Menu="Utilities"
 Title="CMP 170HX Unlock Driver"
-Icon="cmp170hx-unlock-driver.png"
+Icon="microchip"
 ---
 <?php
 $name = 'cmp170hx-unlock-driver';

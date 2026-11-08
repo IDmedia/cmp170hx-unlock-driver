@@ -27,23 +27,29 @@ SH
 chmod +x /usr/local/bin/uname
 
 # The image's curl/git are broken (libnghttp3 drift). Shim curl with python; build.sh uses
-# "curl -L --fail -o FILE URL", same as we do here.
+# "curl -L --fail -o FILE URL", same as we do here. Retries like curl --retry 5 --retry-delay 15.
 cat > /usr/local/bin/curl <<'PY'
 #!/usr/bin/python3
-import sys, shutil, urllib.request
+import sys, shutil, time, urllib.error, urllib.request
 out = url = None; a = sys.argv[1:]; i = 0
 while i < len(a):
     if a[i] == '-o': out = a[i+1]; i += 2; continue
     if not a[i].startswith('-'): url = a[i]
     i += 1
-try:
-    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'curl'})) as r:
-        if out:
-            with open(out, 'wb') as f: shutil.copyfileobj(r, f)
-        else:
-            shutil.copyfileobj(r, sys.stdout.buffer)
-except Exception as e:
-    print(f"curl-shim: {url}: {e}", file=sys.stderr); sys.exit(22)
+for attempt in range(6):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'curl'}), timeout=300) as r:
+            if out:
+                with open(out, 'wb') as f: shutil.copyfileobj(r, f)
+            else:
+                shutil.copyfileobj(r, sys.stdout.buffer)
+        break
+    except Exception as e:
+        # 4xx other than 408/429 won't change on a retry; nor will anything once stdout has data
+        final = isinstance(e, urllib.error.HTTPError) and e.code < 500 and e.code not in (408, 429)
+        if final or attempt == 5 or not out:
+            print(f"curl-shim: {url}: {e}", file=sys.stderr); sys.exit(22)
+        print(f"curl-shim: {url}: {e}, retrying in 15s", file=sys.stderr); time.sleep(15)
 PY
 chmod +x /usr/local/bin/curl
 export PATH=/usr/local/bin:$PATH

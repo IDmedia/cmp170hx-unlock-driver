@@ -10,10 +10,16 @@ TAG="nvidia-$DRV"
 PKG="cmp170hx-nvidia-${DRV}-x86_64-1.txz"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 die() { echo "ERROR: $*" >&2; exit 1; }
+# GitHub hands out the odd 503: retry those (curl's --retry skips 404, so absent files fail at once)
+RETRY=(--retry 5 --retry-delay 15)
 
-if curl -fsSLI -o /dev/null "https://github.com/$GH_REPO/releases/download/$TAG/userspace.json"; then
-  echo "$TAG already published"; exit 0
-fi
+# only a 404 means "not published": anything else would delete and redo a complete release
+code="$(curl -sSLI "${RETRY[@]}" -o /dev/null -w '%{http_code}' "https://github.com/$GH_REPO/releases/download/$TAG/userspace.json")"
+case "$code" in
+  200) echo "$TAG already published"; exit 0 ;;
+  404) ;;
+  *) die "checking $TAG/userspace.json: HTTP $code" ;;
+esac
 bash "$(dirname "$0")/prepare-release.sh" "$TAG"
 gh release delete "$TAG" --yes 2>/dev/null || true    # leftover of an interrupted run (the tag stays)
 
@@ -25,8 +31,8 @@ src="${src%%$'\n'*}"
 stock="nvidia-${DRV}-${src}-1.txz"
 url="https://github.com/unraid/unraid-nvidia-driver/releases/download/$src"
 echo "==> $DRV from $src"
-curl -fsSL -o "$WORK/$stock" "$url/$stock"
-[ "$(md5sum "$WORK/$stock" | cut -d' ' -f1)" = "$(curl -fsSL "$url/$stock.md5" | cut -d' ' -f1)" ] \
+curl -fsSL "${RETRY[@]}" -o "$WORK/$stock" "$url/$stock"
+[ "$(md5sum "$WORK/$stock" | cut -d' ' -f1)" = "$(curl -fsSL "${RETRY[@]}" "$url/$stock.md5" | cut -d' ' -f1)" ] \
   || die "md5 mismatch on $stock"
 
 mkdir "$WORK/pkg"

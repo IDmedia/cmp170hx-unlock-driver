@@ -13,6 +13,8 @@ YML="${1:?output file}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# GitHub hands out the odd 503: retry those (curl's --retry skips 404, so absent files fail at once)
+RETRY=(--retry 5 --retry-delay 15)
 
 MIN="$(jq -r .min_kernel versions.json)"
 PER_TAG="$(jq -r .drivers_per_tag versions.json)"
@@ -23,7 +25,7 @@ STOCK="$(gh api --paginate repos/unraid/unraid-nvidia-driver/releases --jq '.[].
 # "<driver> <ref>" pairs we build
 : > "$WORK/pairs"
 for ref in "${REFS[@]}"; do
-  for drv in $(curl -fsSL "https://raw.githubusercontent.com/amoghmunikote/cmpunlocker/refs/tags/$ref/driver/VERSION" \
+  for drv in $(curl -fsSL "${RETRY[@]}" "https://raw.githubusercontent.com/amoghmunikote/cmpunlocker/refs/tags/$ref/driver/VERSION" \
                | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -rV); do
     if ! grep -qE "^nvidia-${drv//./\\.}-.*-Unraid-1\.txz$" <<<"$STOCK"; then
       echo "notice: driver $drv (cmpunlocker $ref) has no stock unraid-nvidia-driver package anywhere, skipped" >&2
@@ -45,9 +47,17 @@ fi
 for kver in $KERNELS; do
   [ "$(printf '%s\n%s\n' "$MIN" "${kver%%-*}" | sort -V | head -1)" = "$MIN" ] || continue
   have=""
-  # published manifests only, as the plugin sees them (gh would also find drafts)
-  [ -n "${FORCE_KVER:-}" ] || have="$(curl -fsSL "https://github.com/$GH_REPO/releases/download/$kver/manifest.json" 2>/dev/null \
-    | jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' || true)"
+  # published manifests only, as the plugin sees them (gh would also find drafts).
+  # Only a 404 means "nothing built yet": on any other error we would queue a rebuild of everything.
+  if [ -z "${FORCE_KVER:-}" ]; then
+    code="$(curl -sSL "${RETRY[@]}" -o "$WORK/manifest.json" -w '%{http_code}' \
+      "https://github.com/$GH_REPO/releases/download/$kver/manifest.json")"
+    case "$code" in
+      200) have="$(jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' "$WORK/manifest.json")" ;;
+      404) ;;
+      *) echo "ERROR: fetching $kver/manifest.json: HTTP $code" >&2; exit 1 ;;
+    esac
+  fi
   builds=""
   while read -r drv ref; do
     for profile in "${PROFILES[@]}"; do

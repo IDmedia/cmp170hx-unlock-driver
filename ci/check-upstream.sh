@@ -6,8 +6,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# GitHub hands out the odd 503: retry those
+RETRY=(--retry 5 --retry-delay 15)
 
-latest="$(curl -fsSL "https://api.github.com/repos/amoghmunikote/cmpunlocker/tags?per_page=100" \
+latest="$(curl -fsSL "${RETRY[@]}" "https://api.github.com/repos/amoghmunikote/cmpunlocker/tags?per_page=100" \
   | jq -r '.[].name' | grep -E '^v[0-9]+(\.[0-9]+)*$' | sort -V | tail -1)"
 [ -n "$latest" ] || { echo "no cmpunlocker tags found"; exit 1; }
 newest_listed="$(jq -r '.cmpunlocker[]' versions.json | sort -V | tail -1)"
@@ -21,7 +23,7 @@ if git ls-remote --exit-code --heads "$remote" "$branch" >/dev/null; then
   echo "branch $branch already exists, merge request pending"; exit 0
 fi
 
-drivers="$(curl -fsSL "https://raw.githubusercontent.com/amoghmunikote/cmpunlocker/refs/tags/$latest/driver/VERSION" \
+drivers="$(curl -fsSL "${RETRY[@]}" "https://raw.githubusercontent.com/amoghmunikote/cmpunlocker/refs/tags/$latest/driver/VERSION" \
   | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | paste -sd, -)"
 jq --arg t "$latest" '.cmpunlocker += [$t]' versions.json > versions.json.tmp && mv versions.json.tmp versions.json
 git -c user.name="CI" -c user.email="ci@${CI_SERVER_HOST}" commit -qm "Build cmpunlocker $latest (drivers: $drivers)" versions.json

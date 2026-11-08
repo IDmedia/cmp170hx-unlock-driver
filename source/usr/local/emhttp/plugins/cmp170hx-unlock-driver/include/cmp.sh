@@ -302,6 +302,8 @@ cmd_boot() {
   fi
   if [ "$fresh" = 1 ] && [ "$(cfg_get gen2_enable)" = true ] && [ -x "$HAMMER" ]; then gen2_apply; fi
   post_install
+  # the unlock marker is printed once per boot and rotates out of dmesg within days: keep it for the status page
+  dmesg 2>/dev/null | grep -q "late PMA extension status=0x0" && touch "$RUN/pma-seen"
   set_state installed "$(basename "$pkg")"
   if [ "$(cfg_get first_installation)" = true ]; then
     cfg_set first_installation false

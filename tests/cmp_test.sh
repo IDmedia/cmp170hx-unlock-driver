@@ -17,6 +17,7 @@ stub installpkg 'echo "$(basename "$1")" >> "$TEST_DIR/installed"'
 stub modinfo    'grep -q . "$TEST_DIR/installed" 2>/dev/null'     # "installed" once a package was installed
 for c in rmmod depmod logger nvidia-ctk; do stub "$c" 'exit 0'; done
 stub modprobe   '[ ! -f "$TEST_DIR/no_gpu_driver" ]'      # touch no_gpu_driver: the module fails to load
+stub dmesg      'cat "$TEST_DIR/dmesg" 2>/dev/null'
 stub crontab    'if [ "${1:-}" = -l ]; then cat "$TEST_DIR/crontab" 2>/dev/null; else cat > "$TEST_DIR/crontab"; fi'
 export PATH="$T/bin:$PATH" TEST_DIR="$T"
 export CMP_PLUGIN_DIR="$T/flash" CMP_RUN_DIR="$T/run" CMP_ETC="$T/etc" CMP_HAMMER="$T/none" \
@@ -50,7 +51,7 @@ publish() {
     "$T/www/$KVER/manifest.json" > "$T/m" && mv "$T/m" "$T/www/$KVER/manifest.json"
 }
 
-reset() { (cd "$T" && rm -rf flash run etc www/* installed notifications crontab lspci no_gpu_driver); }
+reset() { (cd "$T" && rm -rf flash run etc www/* installed notifications crontab lspci no_gpu_driver dmesg); }
 card() { case "$1" in 8gb) echo '01:00.0 3D controller [0302]: NVIDIA Corporation GA100 [10de:20c2] (rev a1)' ;;
                       10gb) echo '02:00.0 3D controller [0302]: NVIDIA Corporation GA100 [10de:2082] (rev a1)' ;; esac >> "$T/lspci"; }
 boot() { bash "$CMP" boot >/dev/null 2>&1; }
@@ -79,6 +80,10 @@ check "8gb card: userspace then 8gb modules"        installed "cmp170hx-nvidia-6
 check "8gb card: both packages cached"              [ -f "$T/flash/packages/$KVER/cmp170hx-modules-615.71.09-v0.5-8gb-$KVER-1.txz.json" ] && [ -f "$T/flash/packages/nvidia/cmp170hx-nvidia-615.71.09-x86_64-1.txz.md5" ]
 check "8gb card: gen2 modprobe option"              grep -q RmForceEnableGen2 "$T/etc/modprobe.d/cmp-pcie-gen2.conf"
 check "8gb card: first-install cold boot notice"    grep -q "cold boot" "$T/notifications"
+check "no unlock marker in dmesg: none recorded"    [ ! -e "$T/run/pma-seen" ]
+echo 'NVRM: late PMA extension status=0x0' > "$T/dmesg"; rm -rf "$T/run"
+boot
+check "unlock marker in dmesg: recorded at boot"    [ -e "$T/run/pma-seen" ]
 
 # next boot: tmpfs is fresh, flash cache stays, release server is gone
 rm -rf "$T/run" "$T/installed"; kill $SERVER; wait $SERVER 2>/dev/null

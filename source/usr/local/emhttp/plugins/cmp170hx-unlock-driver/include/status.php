@@ -65,9 +65,10 @@ $out['module'] = [
     'version' => sh("modinfo nvidia | awk '/^version:/{print \$2; exit}'"),
     'license' => sh("modinfo nvidia | awk -F': *' '/^license:/{print \$2; exit}'"),
 ];
-// The marker is printed once per boot and can rotate out of dmesg; remember it once seen ($run is cleared on reboot)
+// The marker is printed once per boot and can rotate out of dmesg; cmp.sh boot records it, and once seen here
+// it is remembered too ($run is cleared on reboot). /var/log is tmpfs, so syslog only holds this boot.
 $out['pma_ok']   = file_exists("$run/pma-seen");
-if (!$out['pma_ok'] && (int)sh('dmesg | grep -c "late PMA extension status=0x0"') > 0) {
+if (!$out['pma_ok'] && (int)sh('{ dmesg; cat /var/log/syslog*; } | grep -c "late PMA extension status=0x0"') > 0) {
     $out['pma_ok'] = true;
     @touch("$run/pma-seen");
 }

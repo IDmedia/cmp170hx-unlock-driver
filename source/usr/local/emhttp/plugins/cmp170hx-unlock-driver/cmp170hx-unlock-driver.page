@@ -110,7 +110,12 @@ function renderStatus(d) {
   var hc = '<table class="cmp-table">';
   hc += '<tr><td>Driver loaded</td><td>' + (d.module.version ? chip('OK', 'ok') : chip('No', 'bad')) + '</td></tr>';
   hc += '<tr><td>GPU memory unlocked</td><td>' + (d.gpus.length && d.gpus.every(function(x) { return x.unlock === 'unlocked'; }) ? chip('OK', 'ok') : chip('No', 'bad')) + '</td></tr>';
-  hc += '<tr><td>Unlock marker in kernel log</td><td>' + (d.pma_ok ? chip('OK', 'ok') : chip('Not found', 'warn')) + ' <span class="cmp-dim">late PMA extension status=0x0</span></td></tr>';
+  // after days of uptime the marker can be gone from the log; the memory size above is the real proof
+  var unlocked = d.gpus.length && d.gpus.every(function(x) { return x.unlock === 'unlocked'; });
+  var marker = d.pma_ok ? chip('OK', 'ok') + ' <span class="cmp-dim">late PMA extension status=0x0</span>'
+    : unlocked ? chip('No longer in log', 'dim') + ' <span class="cmp-dim">rotated out after long uptime; the unlocked memory above confirms the unlock</span>'
+    : chip('Not found', 'warn') + ' <span class="cmp-dim">late PMA extension status=0x0</span>';
+  hc += '<tr><td>Unlock marker in kernel log</td><td>' + marker + '</td></tr>';
   hc += '<tr><td>Gen2 retrain log</td><td><code>' + (d.gen2_log ? esc(d.gen2_log).replace(/\n/g, '<br>') : 'no log') + '</code></td></tr>';
   hc += '</table>';
   document.getElementById('cmp-health').innerHTML = hc;

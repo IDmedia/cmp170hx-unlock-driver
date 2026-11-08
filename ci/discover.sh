@@ -44,6 +44,7 @@ fi
 
 : > "$WORK/userspace"
 : > "$WORK/listed"
+: > "$WORK/building"
 : > "$WORK/jobs"
 for kver in $KERNELS; do
   [ "$(printf '%s\n%s\n' "$MIN" "${kver%%-*}" | sort -V | head -1)" = "$MIN" ] || continue
@@ -55,7 +56,8 @@ for kver in $KERNELS; do
       "https://github.com/$GH_REPO/releases/download/$kver/manifest.json")"
     case "$code" in
       200) have="$(jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' "$WORK/manifest.json")"
-           jq -r '.packages[].driver' "$WORK/manifest.json" >> "$WORK/listed" ;;
+           jq -r '.packages[].driver' "$WORK/manifest.json" >> "$WORK/listed"
+           cp "$WORK/manifest.json" "$WORK/m-$kver.json" ;;
       404) ;;
       *) echo "ERROR: fetching $kver/manifest.json: HTTP $code" >&2; exit 1 ;;
     esac
@@ -76,6 +78,7 @@ for kver in $KERNELS; do
     continue
   fi
   echo "$kver: $(grep -c . <<<"$builds") package(s) to build with $gcc" >&2
+  echo "$kver" >> "$WORK/building"
   cat >> "$WORK/jobs" <<EOF
 
 build:$kver:
@@ -105,15 +108,35 @@ publish:$kver:
 EOF
 done
 
-# every driver a published manifest lists needs its userspace release; a missing one is republished
+# Every driver a published manifest lists needs its userspace release, and the manifest must carry that
+# release's checksums (the plugin verifies against them). A missing release is republished; a manifest
+# with other checksums, or listing a release being republished, gets refreshed by publish.sh.
+: > "$WORK/stale"
 for drv in $(sort -u "$WORK/listed"); do
-  code="$(curl -sSLI "${RETRY[@]}" -o /dev/null -w '%{http_code}' \
+  code="$(curl -sSL "${RETRY[@]}" -o "$WORK/u.json" -w '%{http_code}' \
     "https://github.com/$GH_REPO/releases/download/nvidia-$drv/userspace.json")"
   case "$code" in
-    200) ;;
-    404) echo "nvidia-$drv: listed in a manifest but not published, republishing" >&2; echo "$drv" >> "$WORK/userspace" ;;
-    *) echo "ERROR: checking nvidia-$drv/userspace.json: HTTP $code" >&2; exit 1 ;;
+    200) sha="$(jq -r .sha256 "$WORK/u.json")" ;;
+    404) echo "nvidia-$drv: listed in a manifest but not published, republishing" >&2
+         echo "$drv" >> "$WORK/userspace"; sha="" ;;
+    *) echo "ERROR: fetching nvidia-$drv/userspace.json: HTTP $code" >&2; exit 1 ;;
   esac
+  for m in "$WORK"/m-*.json; do
+    cur="$(jq -r --arg d "$drv" 'if any(.packages[]; .driver == $d) then .userspace[$d].sha256 // "none" else empty end' "$m")"
+    [ -z "$cur" ] || [ "$cur" = "$sha" ] || { m="${m##*/m-}"; echo "${m%.json}" >> "$WORK/stale"; }
+  done
+done
+for kver in $(sort -u "$WORK/stale"); do
+  grep -qxF "$kver" "$WORK/building" && continue    # its publish job refreshes the manifest anyway
+  echo "$kver: manifest has outdated userspace checksums, refreshing" >&2
+  cat >> "$WORK/jobs" <<EOF
+
+publish:$kver:
+  extends: .gh
+  stage: publish
+  script:
+    - bash ci/publish.sh $kver
+EOF
 done
 
 # The generated pipeline: userspace releases first, then per kernel build -> publish. One failed

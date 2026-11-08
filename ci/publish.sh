@@ -2,6 +2,7 @@
 # Adds the modules packages built in out/<kver>/ to the GitHub release <kver> and merges them into its
 # manifest.json. Existing packages stay; manifest.json is uploaded last, so it only lists packages whose
 # files are already downloadable, and every listed driver has a published userspace release.
+# With nothing built it only rewrites manifest.json, picking up the current userspace checksums.
 # Usage: ci/publish.sh <kver>      Needs: gh (GH_TOKEN, GH_REPO), git, jq.
 set -euo pipefail
 KVER="${1:?kver}"
@@ -12,7 +13,7 @@ die() { echo "ERROR: $*" >&2; exit 1; }
 # GitHub hands out the odd 503: retry those (curl's --retry skips 404, so absent files fail at once)
 RETRY=(--retry 5 --retry-delay 15)
 
-ls "$OUT"/*.txz.json >/dev/null 2>&1 || die "nothing built in $OUT"
+mapfile -t BUILT < <(ls "$OUT"/*.txz.json 2>/dev/null)
 PUBLIC="https://github.com/$GH_REPO/releases/download"    # what the plugin sees: published releases only
 
 bash "$(dirname "$0")/prepare-release.sh" "$KVER"
@@ -24,13 +25,14 @@ fi
 code="$(curl -sSL "${RETRY[@]}" -o "$WORK/old.json" -w '%{http_code}' "$PUBLIC/$KVER/manifest.json")"
 case "$code" in
   200) ;;
-  404) echo '{"packages":[]}' > "$WORK/old.json" ;;
+  404) [ "${#BUILT[@]}" -gt 0 ] || die "nothing built in $OUT and no manifest.json to refresh"
+       echo '{"packages":[]}' > "$WORK/old.json" ;;
   *) die "fetching $KVER/manifest.json: HTTP $code" ;;
 esac
 
 # new entries replace old ones with the same file name
 jq -s '[.[0].packages[], .[1:][]] | reverse | unique_by(.file) | sort_by(.driver, .cmpunlocker, .profile)' \
-  "$WORK/old.json" "$OUT"/*.txz.json > "$WORK/packages.json"
+  "$WORK/old.json" "${BUILT[@]}" > "$WORK/packages.json"
 
 echo '{}' > "$WORK/userspace.json"
 for drv in $(jq -r '.[].driver' "$WORK/packages.json" | sort -u); do
@@ -41,6 +43,6 @@ done
 jq -n --arg k "$KVER" --arg t "$(date -u +%FT%TZ)" --slurpfile p "$WORK/packages.json" --slurpfile u "$WORK/userspace.json" \
   '{schema:2, kernel:$k, updated:$t, packages:$p[0], userspace:$u[0]}' > "$WORK/manifest.json"
 
-gh release upload "$KVER" --clobber "$OUT"/*.txz "$OUT"/*.txz.md5
+[ "${#BUILT[@]}" = 0 ] || gh release upload "$KVER" --clobber "$OUT"/*.txz "$OUT"/*.txz.md5
 gh release upload "$KVER" --clobber "$WORK/manifest.json"
 echo "==> $KVER: $(jq '.packages | length' "$WORK/manifest.json") packages published"

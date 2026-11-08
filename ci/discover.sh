@@ -43,6 +43,7 @@ else
 fi
 
 : > "$WORK/userspace"
+: > "$WORK/listed"
 : > "$WORK/jobs"
 for kver in $KERNELS; do
   [ "$(printf '%s\n%s\n' "$MIN" "${kver%%-*}" | sort -V | head -1)" = "$MIN" ] || continue
@@ -53,7 +54,8 @@ for kver in $KERNELS; do
     code="$(curl -sSL "${RETRY[@]}" -o "$WORK/manifest.json" -w '%{http_code}' \
       "https://github.com/$GH_REPO/releases/download/$kver/manifest.json")"
     case "$code" in
-      200) have="$(jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' "$WORK/manifest.json")" ;;
+      200) have="$(jq -r '.packages[] | "\(.driver) \(.cmpunlocker) \(.profile)"' "$WORK/manifest.json")"
+           jq -r '.packages[].driver' "$WORK/manifest.json" >> "$WORK/listed" ;;
       404) ;;
       *) echo "ERROR: fetching $kver/manifest.json: HTTP $code" >&2; exit 1 ;;
     esac
@@ -101,6 +103,17 @@ publish:$kver:
   script:
     - bash ci/publish.sh $kver
 EOF
+done
+
+# every driver a published manifest lists needs its userspace release; a missing one is republished
+for drv in $(sort -u "$WORK/listed"); do
+  code="$(curl -sSLI "${RETRY[@]}" -o /dev/null -w '%{http_code}' \
+    "https://github.com/$GH_REPO/releases/download/nvidia-$drv/userspace.json")"
+  case "$code" in
+    200) ;;
+    404) echo "nvidia-$drv: listed in a manifest but not published, republishing" >&2; echo "$drv" >> "$WORK/userspace" ;;
+    *) echo "ERROR: checking nvidia-$drv/userspace.json: HTTP $code" >&2; exit 1 ;;
+  esac
 done
 
 # The generated pipeline: userspace releases first, then per kernel build -> publish. One failed

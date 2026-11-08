@@ -29,15 +29,20 @@ src="$(gh api --paginate repos/unraid/unraid-nvidia-driver/releases \
 src="${src%%$'\n'*}"
 [ -n "$src" ] || die "no stock package for $DRV in any unraid-nvidia-driver release"
 stock="nvidia-${DRV}-${src}-1.txz"
-url="https://github.com/unraid/unraid-nvidia-driver/releases/download/$src"
 echo "==> $DRV from $src"
-curl -fsSL "${RETRY[@]}" -o "$WORK/$stock" "$url/$stock"
-[ "$(md5sum "$WORK/$stock" | cut -d' ' -f1)" = "$(curl -fsSL "${RETRY[@]}" "$url/$stock.md5" | cut -d' ' -f1)" ] \
+# gh downloads with GH_TOKEN: GitHub throttles anonymous release downloads first when it is struggling
+for try in 1 2 3 4 5 6; do
+  gh release download "$src" --repo unraid/unraid-nvidia-driver --dir "$WORK" --clobber \
+    --pattern "$stock" --pattern "$stock.md5" && break
+  [ "$try" -lt 6 ] || die "could not download $stock"
+  echo "download failed, retrying in 15s" >&2; sleep 15
+done
+[ "$(md5sum "$WORK/$stock" | cut -d' ' -f1)" = "$(cut -d' ' -f1 "$WORK/$stock.md5")" ] \
   || die "md5 mismatch on $stock"
 
 mkdir "$WORK/pkg"
 tar -xJpf "$WORK/$stock" --numeric-owner -C "$WORK/pkg"
-rm -f "$WORK/$stock"
+rm -f "$WORK/$stock" "$WORK/$stock.md5"
 [ -f "$WORK/pkg/lib/firmware/nvidia/$DRV/gsp_ga10x.bin" ] || die "GSP firmware missing"
 [ -x "$WORK/pkg/usr/bin/nvidia-smi" ] && [ -x "$WORK/pkg/usr/bin/nvidia-ctk" ] || die "nvidia-smi/nvidia-ctk missing"
 rm -rf "$WORK/pkg/lib/modules"

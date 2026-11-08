@@ -3,11 +3,11 @@
   <!ENTITY name      "cmp170hx-unlock-driver">
   <!ENTITY author    "IDmedia">
   <!ENTITY repo      "IDmedia/cmp170hx-unlock-driver">
-  <!ENTITY version   "2026.10.29">
+  <!ENTITY version   "2026.11.08">
   <!ENTITY launch    "Settings/cmp170hx-unlock-driver">
   <!ENTITY gitURL    "https://github.com/&repo;/raw/main">
   <!ENTITY pluginURL "&gitURL;/&name;.plg">
-  <!ENTITY md5       "0878c511a494aaaaebdaf6adc9cc8d9b">
+  <!ENTITY md5       "e2b5e3d5f2a5764a3d28218922b8e331">
   <!ENTITY plugin    "/boot/config/plugins/&name;">
   <!ENTITY emhttp    "/usr/local/emhttp/plugins/&name;">
 ]>
@@ -15,6 +15,10 @@
 <PLUGIN name="&name;" author="&author;" version="&version;" launch="&launch;" pluginURL="&pluginURL;" min="7.0.0" support="https://github.com/&repo;/issues">
 
 <CHANGES>
+
+###2026.11.08
+- Unlock marker is recorded at boot, so it stays OK however long the server runs (takes effect after the next reboot)
+- When the marker has rotated out of the kernel log but the GPU memory is unlocked, the status page shows a neutral "No longer in log" instead of a Not found warning
 
 ###2026.10.29
 - Utilities icon is a theme-coloured microchip, matching the other tiles in light and dark themes
